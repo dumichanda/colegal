@@ -8,6 +8,10 @@ export async function GET(request: NextRequest) {
     const organizationId = searchParams.get("organizationId")
     const format = searchParams.get("format") || "json"
 
+    if (!sql) {
+      return NextResponse.json({ success: false, error: "Database connection not available" }, { status: 503 })
+    }
+
     let reportData: any = {}
 
     switch (type) {
@@ -19,12 +23,14 @@ export async function GET(request: NextRequest) {
             cr.risk_level,
             cm.status,
             cm.last_checked,
-            cm.next_check_due
+            cm.next_check_due,
+            o.name as organization_name
           FROM compliance_rules cr
           LEFT JOIN compliance_monitoring cm ON cr.id = cm.rule_id
+          LEFT JOIN organizations o ON cm.organization_id = o.id
           WHERE cr.is_active = true
           ${organizationId ? sql`AND cm.organization_id = ${organizationId}` : sql``}
-          ORDER BY cr.risk_level DESC
+          ORDER BY cr.risk_level DESC, cr.created_at DESC
         `
 
         reportData = {
@@ -47,12 +53,14 @@ export async function GET(request: NextRequest) {
             d.type,
             d.status,
             d.created_at,
+            o.name as organization_name,
             COUNT(cc.id) as clause_count,
             COUNT(CASE WHEN cc.risk_level = 'high' THEN 1 END) as high_risk_clauses
           FROM documents d
           LEFT JOIN contract_clauses cc ON d.id = cc.document_id
+          LEFT JOIN organizations o ON d.organization_id = o.id
           ${organizationId ? sql`WHERE d.organization_id = ${organizationId}` : sql``}
-          GROUP BY d.id, d.title, d.type, d.status, d.created_at
+          GROUP BY d.id, d.title, d.type, d.status, d.created_at, o.name
           ORDER BY d.created_at DESC
         `
 
@@ -64,6 +72,7 @@ export async function GET(request: NextRequest) {
             totalDocuments: documentsData.length,
             analyzed: documentsData.filter((d: any) => d.status === "completed").length,
             processing: documentsData.filter((d: any) => d.status === "processing").length,
+            pending: documentsData.filter((d: any) => d.status === "pending").length,
           },
         }
         break

@@ -9,84 +9,16 @@ const sql = process.env.DATABASE_URL ? neon(process.env.DATABASE_URL) : null
 
 export { sql }
 
-// Mock data for when database is not available
-const mockDocuments = [
-  {
-    id: "1",
-    title: "Employment Contract Template",
-    type: "contract",
-    file_path: "/documents/employment-contract.pdf",
-    file_size: 245760,
-    mime_type: "application/pdf",
-    uploaded_by: "admin",
-    organization_id: "org-1",
-    created_at: new Date().toISOString(),
-    analysis_type: "contract_analysis",
-    confidence_score: 0.95,
-  },
-  {
-    id: "2",
-    title: "POPIA Compliance Checklist",
-    type: "compliance",
-    file_path: "/documents/popia-checklist.pdf",
-    file_size: 156432,
-    mime_type: "application/pdf",
-    uploaded_by: "admin",
-    organization_id: "org-1",
-    created_at: new Date().toISOString(),
-    analysis_type: "compliance_check",
-    confidence_score: 0.88,
-  },
-]
-
-const mockComplianceRules = [
-  {
-    id: "1",
-    title: "POPIA Data Processing",
-    description: "Ensure all data processing complies with POPIA requirements",
-    risk_level: "high",
-    is_active: true,
-    created_at: new Date().toISOString(),
-    status: "compliant",
-    last_checked: new Date().toISOString(),
-    next_check_due: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: "2",
-    title: "B-BBEE Compliance",
-    description: "Monitor B-BBEE scorecard requirements",
-    risk_level: "medium",
-    is_active: true,
-    created_at: new Date().toISOString(),
-    status: "at_risk",
-    last_checked: new Date().toISOString(),
-    next_check_due: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-]
-
-const mockRegulatoryUpdates = [
-  {
-    id: "1",
-    title: "POPIA Amendment Act 2024",
-    description: "New amendments to data protection requirements",
-    source: "Department of Justice",
-    effective_date: new Date().toISOString(),
-    created_at: new Date().toISOString(),
-    impact_level: "high",
-  },
-]
-
-// Database helper functions with fallback to mock data
+// Database helper functions - now using real database
 export async function getDocuments(organizationId?: string) {
   if (!sql) {
-    console.log("Using mock data for documents")
-    return mockDocuments.filter((doc) => !organizationId || doc.organization_id === organizationId)
+    throw new Error("Database connection not available")
   }
 
   try {
     if (organizationId) {
       return await sql`
-        SELECT d.*, da.analysis_type, da.confidence_score 
+        SELECT d.*, da.analysis_type, da.confidence_score, da.results
         FROM documents d
         LEFT JOIN document_analyses da ON d.id = da.document_id
         WHERE d.organization_id = ${organizationId}
@@ -95,15 +27,34 @@ export async function getDocuments(organizationId?: string) {
     }
 
     return await sql`
-      SELECT d.*, da.analysis_type, da.confidence_score 
+      SELECT d.*, da.analysis_type, da.confidence_score, da.results
       FROM documents d
       LEFT JOIN document_analyses da ON d.id = da.document_id
       ORDER BY d.created_at DESC
       LIMIT 50
     `
   } catch (error) {
-    console.error("Database error, falling back to mock data:", error)
-    return mockDocuments
+    console.error("Database error:", error)
+    throw error
+  }
+}
+
+export async function getDocumentById(id: string) {
+  if (!sql) {
+    throw new Error("Database connection not available")
+  }
+
+  try {
+    const [document] = await sql`
+      SELECT d.*, da.analysis_type, da.confidence_score, da.results
+      FROM documents d
+      LEFT JOIN document_analyses da ON d.id = da.document_id
+      WHERE d.id = ${id}
+    `
+    return document
+  } catch (error) {
+    console.error("Database error:", error)
+    throw error
   }
 }
 
@@ -117,36 +68,25 @@ export async function createDocument(data: {
   organization_id?: string
 }) {
   if (!sql) {
-    console.log("Using mock data for document creation")
-    const mockDoc = {
-      id: Date.now().toString(),
-      ...data,
-      created_at: new Date().toISOString(),
-    }
-    return mockDoc
+    throw new Error("Database connection not available")
   }
 
   try {
     const [document] = await sql`
-      INSERT INTO documents (title, type, file_path, file_size, mime_type, uploaded_by, organization_id)
-      VALUES (${data.title}, ${data.type}, ${data.file_path}, ${data.file_size}, ${data.mime_type}, ${data.uploaded_by}, ${data.organization_id})
+      INSERT INTO documents (title, type, file_path, file_size, mime_type, uploaded_by, organization_id, status)
+      VALUES (${data.title}, ${data.type}, ${data.file_path}, ${data.file_size}, ${data.mime_type}, ${data.uploaded_by}, ${data.organization_id}, 'pending')
       RETURNING *
     `
     return document
   } catch (error) {
-    console.error("Database error, using mock response:", error)
-    return {
-      id: Date.now().toString(),
-      ...data,
-      created_at: new Date().toISOString(),
-    }
+    console.error("Database error:", error)
+    throw error
   }
 }
 
-export async function getComplianceRules() {
+export async function getComplianceRules(organizationId?: string) {
   if (!sql) {
-    console.log("Using mock data for compliance rules")
-    return mockComplianceRules
+    throw new Error("Database connection not available")
   }
 
   try {
@@ -155,18 +95,18 @@ export async function getComplianceRules() {
       FROM compliance_rules cr
       LEFT JOIN compliance_monitoring cm ON cr.id = cm.rule_id
       WHERE cr.is_active = true
+      ${organizationId ? sql`AND (cm.organization_id = ${organizationId} OR cm.organization_id IS NULL)` : sql``}
       ORDER BY cr.risk_level DESC, cr.created_at DESC
     `
   } catch (error) {
-    console.error("Database error, falling back to mock data:", error)
-    return mockComplianceRules
+    console.error("Database error:", error)
+    throw error
   }
 }
 
 export async function getRegulatoryUpdates(limit = 10) {
   if (!sql) {
-    console.log("Using mock data for regulatory updates")
-    return mockRegulatoryUpdates.slice(0, limit)
+    throw new Error("Database connection not available")
   }
 
   try {
@@ -176,7 +116,59 @@ export async function getRegulatoryUpdates(limit = 10) {
       LIMIT ${limit}
     `
   } catch (error) {
-    console.error("Database error, falling back to mock data:", error)
-    return mockRegulatoryUpdates.slice(0, limit)
+    console.error("Database error:", error)
+    throw error
+  }
+}
+
+export async function getContractClauses(documentId: string) {
+  if (!sql) {
+    throw new Error("Database connection not available")
+  }
+
+  try {
+    return await sql`
+      SELECT * FROM contract_clauses
+      WHERE document_id = ${documentId}
+      ORDER BY page_number ASC, position ASC
+    `
+  } catch (error) {
+    console.error("Database error:", error)
+    throw error
+  }
+}
+
+export async function getOrganizations() {
+  if (!sql) {
+    throw new Error("Database connection not available")
+  }
+
+  try {
+    return await sql`
+      SELECT * FROM organizations
+      ORDER BY name ASC
+    `
+  } catch (error) {
+    console.error("Database error:", error)
+    throw error
+  }
+}
+
+export async function getUsers(organizationId?: string) {
+  if (!sql) {
+    throw new Error("Database connection not available")
+  }
+
+  try {
+    return await sql`
+      SELECT u.*, o.name as organization_name
+      FROM users u
+      LEFT JOIN organizations o ON u.organization_id = o.id
+      ${organizationId ? sql`WHERE u.organization_id = ${organizationId}` : sql``}
+      ORDER BY u.created_at DESC
+    `
+  } catch (error) {
+    console.error("Database error:", error)
+    throw error
   }
 }
