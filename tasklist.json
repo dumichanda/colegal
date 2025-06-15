@@ -1,0 +1,26 @@
+{
+  "lastUpdated": "2024-12-15T12:00:00.000Z",
+  "summary": {
+    "totalEvents": 0,
+    "eventsByType": {},
+    "recentActivity": [],
+    "activeUsers": [],
+    "systemHealth": {
+      "status": "healthy",
+      "lastUpdate": "2024-12-15T12:00:00.000Z",
+      "performance": {
+        "averageResponseTime": 0,
+        "errorRate": 0
+      }
+    }
+  },
+  "events": [],
+  "metadata": {
+    "version": "1.0.0",
+    "totalEventsTracked": 0,
+    "systemInfo": {
+      "nodeVersion": "v18.0.0",
+      "platform": "linux"
+    }
+  }
+}
