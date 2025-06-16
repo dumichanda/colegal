@@ -2,13 +2,34 @@
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { FileText, AlertTriangle, CheckCircle, Clock } from "lucide-react"
+import { FileText, AlertTriangle, CheckCircle, TrendingUp } from "lucide-react"
 
 interface DashboardStats {
-  totalDocuments: number
-  pendingReviews: number
-  complianceScore: number
-  activeAlerts: number
+  documents: {
+    total: number
+    active: number
+    recent: number
+  }
+  compliance: {
+    totalAlerts: number
+    activeAlerts: number
+    criticalAlerts: number
+    overdueAlerts: number
+    complianceRate: number
+  }
+  tasks: {
+    total: number
+    pending: number
+    completed: number
+    failed: number
+    completionRate: number
+  }
+  recentActivity: Array<{
+    type: string
+    name: string
+    createdAt: string
+    status: string
+  }>
 }
 
 export function DashboardStats() {
@@ -22,7 +43,7 @@ export function DashboardStats() {
         setLoading(true)
         setError(null)
 
-        console.log("Fetching dashboard stats...")
+        console.log("🔄 Fetching dashboard stats...")
 
         const response = await fetch("/api/dashboard/stats")
 
@@ -31,7 +52,7 @@ export function DashboardStats() {
         }
 
         const data = await response.json()
-        console.log("Dashboard stats API response:", data)
+        console.log("✅ Dashboard stats API response:", data)
 
         if (data.success) {
           setStats(data.data)
@@ -39,14 +60,14 @@ export function DashboardStats() {
           throw new Error(data.error || "Failed to fetch stats")
         }
       } catch (err) {
-        console.error("Error fetching dashboard stats:", err)
+        console.error("❌ Error fetching dashboard stats:", err)
         setError(err instanceof Error ? err.message : "Failed to fetch stats")
         // Fallback data
         setStats({
-          totalDocuments: 0,
-          pendingReviews: 0,
-          complianceScore: 0,
-          activeAlerts: 0,
+          documents: { total: 0, active: 0, recent: 0 },
+          compliance: { totalAlerts: 0, activeAlerts: 0, criticalAlerts: 0, overdueAlerts: 0, complianceRate: 0 },
+          tasks: { total: 0, pending: 0, completed: 0, failed: 0, completionRate: 0 },
+          recentActivity: [],
         })
       } finally {
         setLoading(false)
@@ -55,6 +76,18 @@ export function DashboardStats() {
 
     fetchStats()
   }, [])
+
+  const getComplianceColor = (rate: number) => {
+    if (rate >= 90) return "text-green-600"
+    if (rate >= 70) return "text-yellow-600"
+    return "text-red-600"
+  }
+
+  const getTaskCompletionColor = (rate: number) => {
+    if (rate >= 80) return "text-green-600"
+    if (rate >= 50) return "text-yellow-600"
+    return "text-red-600"
+  }
 
   if (loading) {
     return (
@@ -95,30 +128,40 @@ export function DashboardStats() {
           <FileText className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{stats.totalDocuments}</div>
-          <p className="text-xs text-muted-foreground">Documents in system</p>
+          <div className="text-2xl font-bold">{stats.documents.total}</div>
+          <p className="text-xs text-muted-foreground">
+            {stats.documents.active} active • {stats.documents.recent} recent
+          </p>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Pending Reviews</CardTitle>
-          <Clock className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{stats.pendingReviews}</div>
-          <p className="text-xs text-muted-foreground">Awaiting review</p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Compliance Score</CardTitle>
+          <CardTitle className="text-sm font-medium">Compliance Status</CardTitle>
           <CheckCircle className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{stats.complianceScore}%</div>
-          <p className="text-xs text-muted-foreground">Overall compliance</p>
+          <div className={`text-2xl font-bold ${getComplianceColor(stats.compliance.complianceRate)}`}>
+            {stats.compliance.complianceRate}%
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {stats.compliance.activeAlerts} active alerts • {stats.compliance.criticalAlerts} critical
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Task Progress</CardTitle>
+          <TrendingUp className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className={`text-2xl font-bold ${getTaskCompletionColor(stats.tasks.completionRate)}`}>
+            {stats.tasks.completionRate}%
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {stats.tasks.completed}/{stats.tasks.total} completed • {stats.tasks.pending} pending
+          </p>
         </CardContent>
       </Card>
 
@@ -128,8 +171,10 @@ export function DashboardStats() {
           <AlertTriangle className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{stats.activeAlerts}</div>
-          <p className="text-xs text-muted-foreground">Require attention</p>
+          <div className="text-2xl font-bold text-orange-600">{stats.compliance.activeAlerts}</div>
+          <p className="text-xs text-muted-foreground">
+            {stats.compliance.overdueAlerts} overdue • {stats.compliance.criticalAlerts} critical
+          </p>
         </CardContent>
       </Card>
     </div>
