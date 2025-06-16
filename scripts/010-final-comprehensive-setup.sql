@@ -15,6 +15,23 @@ END $$;
 -- 1. CREATE MISSING TABLES (only if they don't exist)
 -- ============================================================================
 
+-- Tasks Table (this is what's causing the current error)
+CREATE TABLE IF NOT EXISTS tasks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    type VARCHAR(50) NOT NULL DEFAULT 'general',
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'completed', 'failed', 'cancelled')),
+    priority VARCHAR(20) DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'critical')),
+    assigned_to UUID,
+    organization_id UUID,
+    due_date TIMESTAMP WITH TIME ZONE,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    created_by UUID,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Compliance Alerts Table
 CREATE TABLE IF NOT EXISTS compliance_alerts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -108,6 +125,12 @@ CREATE TABLE IF NOT EXISTS compliance_reports (
 -- 2. CREATE INDEXES FOR PERFORMANCE
 -- ============================================================================
 
+-- Tasks Indexes
+CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks(priority);
+CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
+CREATE INDEX IF NOT EXISTS idx_tasks_assigned_to ON tasks(assigned_to);
+
 -- Compliance Alerts Indexes
 CREATE INDEX IF NOT EXISTS idx_compliance_alerts_status ON compliance_alerts(status);
 CREATE INDEX IF NOT EXISTS idx_compliance_alerts_priority ON compliance_alerts(priority);
@@ -129,8 +152,19 @@ CREATE INDEX IF NOT EXISTS idx_compliance_reports_type ON compliance_reports(rep
 -- 3. INSERT COMPREHENSIVE SEED DATA
 -- ============================================================================
 
--- Clear existing data first (optional - remove if you want to keep existing data)
--- TRUNCATE compliance_alerts, depositions, case_timelines, compliance_reports CASCADE;
+-- Tasks Seed Data (this fixes the immediate error)
+INSERT INTO tasks (title, description, type, status, priority, due_date) VALUES
+('Review POPIA Compliance Documentation', 'Complete annual review of POPIA compliance documentation and update policies', 'compliance', 'pending', 'high', NOW() + INTERVAL '7 days'),
+('Contract Analysis - ABC Corp', 'Analyze new vendor contract for compliance and risk assessment', 'analysis', 'in_progress', 'medium', NOW() + INTERVAL '3 days'),
+('Deposition Preparation - Smith Case', 'Prepare questions and documentation for upcoming deposition', 'legal', 'pending', 'high', NOW() + INTERVAL '2 days'),
+('Regulatory Update Review', 'Review new B-BBEE regulations and assess impact on current operations', 'regulatory', 'completed', 'medium', NOW() - INTERVAL '1 day'),
+('Document Classification', 'Classify and tag new legal documents in the system', 'document', 'pending', 'low', NOW() + INTERVAL '14 days'),
+('Compliance Report Generation', 'Generate quarterly compliance report for board review', 'reporting', 'in_progress', 'high', NOW() + INTERVAL '5 days'),
+('Risk Assessment Update', 'Update enterprise risk assessment with new regulatory changes', 'risk', 'pending', 'medium', NOW() + INTERVAL '10 days'),
+('Training Material Update', 'Update compliance training materials with latest regulations', 'training', 'pending', 'low', NOW() + INTERVAL '21 days'),
+('Audit Preparation', 'Prepare documentation for upcoming compliance audit', 'audit', 'pending', 'critical', NOW() + INTERVAL '1 day'),
+('Policy Review - Data Protection', 'Annual review of data protection policies and procedures', 'policy', 'completed', 'high', NOW() - INTERVAL '3 days')
+ON CONFLICT DO NOTHING;
 
 -- Compliance Alerts Seed Data
 INSERT INTO compliance_alerts (title, description, priority, due_date, type, regulation_source, jurisdiction) VALUES
@@ -194,48 +228,7 @@ INSERT INTO compliance_reports (report_name, report_type, status, report_data) V
 ON CONFLICT DO NOTHING;
 
 -- ============================================================================
--- 4. CREATE USEFUL VIEWS
--- ============================================================================
-
--- Active Compliance Alerts View
-CREATE OR REPLACE VIEW active_compliance_alerts AS
-SELECT 
-    ca.*,
-    CASE 
-        WHEN due_date < CURRENT_DATE THEN 'overdue'
-        WHEN due_date <= CURRENT_DATE + INTERVAL '7 days' THEN 'urgent'
-        WHEN due_date <= CURRENT_DATE + INTERVAL '30 days' THEN 'upcoming'
-        ELSE 'future'
-    END as urgency_status
-FROM compliance_alerts ca
-WHERE ca.status = 'active'
-ORDER BY 
-    CASE ca.priority 
-        WHEN 'Critical' THEN 1
-        WHEN 'High' THEN 2
-        WHEN 'Medium' THEN 3
-        WHEN 'Low' THEN 4
-    END,
-    ca.due_date ASC;
-
--- Recent Depositions View
-CREATE OR REPLACE VIEW recent_depositions AS
-SELECT 
-    d.*,
-    COUNT(da.id) as analysis_count,
-    CASE 
-        WHEN d.status = 'completed' THEN 'Complete'
-        WHEN d.status = 'in_progress' THEN 'In Progress'
-        WHEN d.status = 'pending' THEN 'Pending'
-        ELSE 'Unknown'
-    END as status_display
-FROM depositions d
-LEFT JOIN deposition_analyses da ON d.id = da.deposition_id
-GROUP BY d.id
-ORDER BY d.date_conducted DESC;
-
--- ============================================================================
--- 5. VERIFICATION AND SUMMARY
+-- 4. VERIFICATION AND SUMMARY
 -- ============================================================================
 
 -- Show table counts
@@ -252,7 +245,7 @@ BEGIN
         SELECT table_name 
         FROM information_schema.tables 
         WHERE table_schema = 'public' 
-        AND table_name IN ('compliance_alerts', 'depositions', 'deposition_analyses', 'case_timelines', 'timeline_events', 'compliance_reports')
+        AND table_name IN ('tasks', 'compliance_alerts', 'depositions', 'deposition_analyses', 'case_timelines', 'timeline_events', 'compliance_reports')
         ORDER BY table_name
     LOOP
         EXECUTE format('SELECT COUNT(*) FROM %I', rec.table_name) INTO table_count;
