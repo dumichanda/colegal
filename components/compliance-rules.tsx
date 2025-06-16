@@ -143,8 +143,8 @@ export function ComplianceRules() {
               <div key={rule.id} className="p-4 border rounded-lg hover:bg-gray-50 transition-colors">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
-                    <h3 className="font-medium text-gray-900 mb-1">{rule.title}</h3>
-                    <p className="text-sm text-gray-600 mb-2">{rule.description}</p>
+                    <h3 className="font-medium text-gray-100 mb-1">{rule.title}</h3>
+                    <p className="text-sm text-gray-300 mb-2">{rule.description}</p>
                     <div className="flex items-center space-x-2">
                       <Badge variant="outline" className="text-xs">
                         {rule.category}
@@ -165,7 +165,7 @@ export function ComplianceRules() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between text-xs text-gray-500">
+                <div className="flex items-center justify-between text-xs text-gray-400">
                   <span>Last checked: {rule.lastChecked}</span>
                   <span>Next check: {rule.nextCheck}</span>
                 </div>

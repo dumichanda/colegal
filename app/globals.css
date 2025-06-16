@@ -117,3 +117,32 @@ body {
     border-bottom: none !important;
   }
 }
+
+/* Improved text contrast for dark theme */
+.dark .text-gray-600 {
+  color: rgb(156 163 175) !important; /* gray-400 */
+}
+
+.dark .text-gray-500 {
+  color: rgb(156 163 175) !important; /* gray-400 */
+}
+
+.dark .text-gray-900 {
+  color: rgb(243 244 246) !important; /* gray-100 */
+}
+
+/* Ensure good contrast for all text elements */
+.dark p,
+.dark span,
+.dark div {
+  color: rgb(209 213 219); /* gray-300 */
+}
+
+.dark h1,
+.dark h2,
+.dark h3,
+.dark h4,
+.dark h5,
+.dark h6 {
+  color: rgb(243 244 246) !important; /* gray-100 */
+}
