@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -12,64 +12,69 @@ interface DocumentAnalysisProps {
   documentId: string
 }
 
+interface DocumentAnalysis {
+  id: string
+  title: string
+  type: string
+  status: string
+  risk_level: string
+  overall_score: number
+  clauses: Array<{
+    id: string
+    type: string
+    content: string
+    risk_level: string
+    page_number: number
+    recommendation: string
+  }>
+  key_terms: Array<{
+    term: string
+    value: string
+  }>
+  compliance_checks: Array<{
+    rule: string
+    status: string
+    details: string
+  }>
+  created_at: string
+  updated_at: string
+}
+
 export function DocumentAnalysis({ documentId }: DocumentAnalysisProps) {
+  const [analysis, setAnalysis] = useState<DocumentAnalysis | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState("overview")
 
-  // Mock data for demo purposes
-  const document = {
-    id: documentId,
-    title: "Software License Agreement - TechCorp",
-    type: "Contract",
-    status: "Analyzed",
-    riskLevel: "Medium",
-    overallScore: 78,
-    clauses: [
-      {
-        id: 1,
-        type: "Termination",
-        content: "Either party may terminate this Agreement with thirty (30) days written notice...",
-        riskLevel: "Low",
-        page: 3,
-        recommendation: "Standard termination clause with reasonable notice period.",
-      },
-      {
-        id: 2,
-        type: "Liability Limitation",
-        content: "In no event shall the total liability of either party exceed the amount paid under this Agreement...",
-        riskLevel: "Medium",
-        page: 7,
-        recommendation: "Consider adding mutual liability caps and specific exclusions for certain damages.",
-      },
-      {
-        id: 3,
-        type: "Intellectual Property",
-        content: "All intellectual property rights in the Software shall remain with Licensor...",
-        riskLevel: "High",
-        page: 5,
-        recommendation:
-          "Broad IP assignment clause may limit your ability to use derivative works. Consider negotiating more specific language.",
-      },
-    ],
-    keyTerms: [
-      { term: "Contract Value", value: "$250,000 annually" },
-      { term: "Term Length", value: "3 years with auto-renewal" },
-      { term: "Payment Terms", value: "Net 30 days" },
-      { term: "Governing Law", value: "Delaware" },
-    ],
-    complianceChecks: [
-      { rule: "GDPR Data Processing", status: "Compliant", details: "Adequate data protection clauses present" },
-      { rule: "SOX Financial Controls", status: "At Risk", details: "Missing audit trail requirements" },
-      { rule: "Industry Standards", status: "Compliant", details: "Meets software licensing best practices" },
-    ],
-  }
+  useEffect(() => {
+    async function fetchAnalysis() {
+      try {
+        setLoading(true)
+        const response = await fetch(`/api/documents/${documentId}/analysis`)
+        if (!response.ok) {
+          throw new Error("Failed to fetch document analysis")
+        }
+        const data = await response.json()
+        setAnalysis(data)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "An error occurred")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (documentId) {
+      fetchAnalysis()
+    }
+  }, [documentId])
 
   const getRiskColor = (risk: string) => {
-    switch (risk) {
-      case "High":
+    switch (risk.toLowerCase()) {
+      case "high":
         return "text-red-600 bg-red-50"
-      case "Medium":
+      case "medium":
         return "text-yellow-600 bg-yellow-50"
-      case "Low":
+      case "low":
         return "text-green-600 bg-green-50"
       default:
         return "text-gray-600 bg-gray-50"
@@ -77,16 +82,61 @@ export function DocumentAnalysis({ documentId }: DocumentAnalysisProps) {
   }
 
   const getComplianceColor = (status: string) => {
-    switch (status) {
-      case "Compliant":
+    switch (status.toLowerCase()) {
+      case "compliant":
         return "text-green-600"
-      case "At Risk":
+      case "at risk":
         return "text-yellow-600"
-      case "Non-Compliant":
+      case "non-compliant":
         return "text-red-600"
       default:
         return "text-gray-600"
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Card className="bg-slate-800 border-slate-700">
+          <CardContent className="p-6">
+            <div className="animate-pulse space-y-4">
+              <div className="h-6 bg-slate-700 rounded w-1/2"></div>
+              <div className="h-4 bg-slate-700 rounded w-3/4"></div>
+              <div className="grid grid-cols-3 gap-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-16 bg-slate-700 rounded"></div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <Card className="bg-slate-800 border-slate-700">
+        <CardContent className="p-6">
+          <div className="text-red-400 text-center">
+            <AlertTriangle className="w-12 h-12 mx-auto mb-2" />
+            <p>Error loading analysis: {error}</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (!analysis) {
+    return (
+      <Card className="bg-slate-800 border-slate-700">
+        <CardContent className="p-6">
+          <div className="text-slate-400 text-center">
+            <p>No analysis available for this document</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
@@ -96,15 +146,20 @@ export function DocumentAnalysis({ documentId }: DocumentAnalysisProps) {
         <CardHeader>
           <div className="flex items-start justify-between">
             <div>
-              <CardTitle className="text-xl text-white">{document.title}</CardTitle>
+              <CardTitle className="text-xl text-white">{analysis.title}</CardTitle>
               <div className="flex items-center space-x-2 mt-2">
                 <Badge variant="outline" className="border-slate-600 text-slate-300">
-                  {document.type}
+                  {analysis.type}
                 </Badge>
-                <Badge variant={document.riskLevel === "High" ? "destructive" : "outline"} className="border-slate-600">
-                  {document.riskLevel} Risk
+                <Badge
+                  variant={analysis.risk_level === "high" ? "destructive" : "outline"}
+                  className="border-slate-600"
+                >
+                  {analysis.risk_level} Risk
                 </Badge>
-                <span className="text-sm text-slate-400">• Analyzed 2 hours ago</span>
+                <span className="text-sm text-slate-400">
+                  • Analyzed {new Date(analysis.updated_at).toLocaleDateString()}
+                </span>
               </div>
             </div>
             <div className="flex space-x-2">
@@ -122,17 +177,17 @@ export function DocumentAnalysis({ documentId }: DocumentAnalysisProps) {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="text-center">
-              <div className="text-3xl font-bold text-white">{document.overallScore}</div>
+              <div className="text-3xl font-bold text-white">{analysis.overall_score}</div>
               <div className="text-sm text-slate-400">Overall Score</div>
-              <Progress value={document.overallScore} className="mt-2" />
+              <Progress value={analysis.overall_score} className="mt-2" />
             </div>
             <div className="text-center">
-              <div className="text-3xl font-bold text-white">{document.clauses.length}</div>
+              <div className="text-3xl font-bold text-white">{analysis.clauses.length}</div>
               <div className="text-sm text-slate-400">Clauses Analyzed</div>
             </div>
             <div className="text-center">
               <div className="text-3xl font-bold text-red-400">
-                {document.clauses.filter((c) => c.riskLevel === "High").length}
+                {analysis.clauses.filter((c) => c.risk_level === "high").length}
               </div>
               <div className="text-sm text-slate-400">High Risk Issues</div>
             </div>
@@ -164,14 +219,18 @@ export function DocumentAnalysis({ documentId }: DocumentAnalysisProps) {
               <CardTitle className="text-lg text-white">Key Terms</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {document.keyTerms.map((term, index) => (
-                  <div key={index} className="flex justify-between items-center p-3 bg-slate-700 rounded-lg">
-                    <span className="font-medium text-white">{term.term}</span>
-                    <span className="text-slate-300">{term.value}</span>
-                  </div>
-                ))}
-              </div>
+              {analysis.key_terms.length === 0 ? (
+                <div className="text-center py-4 text-slate-400">No key terms extracted</div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {analysis.key_terms.map((term, index) => (
+                    <div key={index} className="flex justify-between items-center p-3 bg-slate-700 rounded-lg">
+                      <span className="font-medium text-white">{term.term}</span>
+                      <span className="text-slate-300">{term.value}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -182,13 +241,13 @@ export function DocumentAnalysis({ documentId }: DocumentAnalysisProps) {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {document.clauses.map((clause) => (
+                {analysis.clauses.map((clause) => (
                   <div key={clause.id} className="flex items-start space-x-3 p-4 border border-slate-700 rounded-lg">
                     <AlertTriangle
                       className={`w-5 h-5 mt-0.5 ${
-                        clause.riskLevel === "High"
+                        clause.risk_level === "high"
                           ? "text-red-400"
-                          : clause.riskLevel === "Medium"
+                          : clause.risk_level === "medium"
                             ? "text-yellow-400"
                             : "text-green-400"
                       }`}
@@ -197,14 +256,14 @@ export function DocumentAnalysis({ documentId }: DocumentAnalysisProps) {
                       <div className="flex items-center justify-between mb-2">
                         <h4 className="font-medium text-white">{clause.type}</h4>
                         <Badge
-                          variant={clause.riskLevel === "High" ? "destructive" : "outline"}
+                          variant={clause.risk_level === "high" ? "destructive" : "outline"}
                           className="text-xs border-slate-600"
                         >
-                          {clause.riskLevel} Risk
+                          {clause.risk_level} Risk
                         </Badge>
                       </div>
                       <p className="text-sm text-slate-300 mb-2">{clause.recommendation}</p>
-                      <span className="text-xs text-slate-500">Page {clause.page}</span>
+                      <span className="text-xs text-slate-500">Page {clause.page_number}</span>
                     </div>
                   </div>
                 ))}
@@ -220,21 +279,21 @@ export function DocumentAnalysis({ documentId }: DocumentAnalysisProps) {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {document.clauses.map((clause) => (
+                {analysis.clauses.map((clause) => (
                   <div key={clause.id} className="border border-slate-700 rounded-lg p-4">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center space-x-2">
                         <h4 className="font-medium text-white">{clause.type}</h4>
                         <Badge variant="outline" className="text-xs border-slate-600 text-slate-300">
-                          Page {clause.page}
+                          Page {clause.page_number}
                         </Badge>
                       </div>
                       <div className="flex items-center space-x-2">
                         <Badge
-                          variant={clause.riskLevel === "High" ? "destructive" : "outline"}
+                          variant={clause.risk_level === "high" ? "destructive" : "outline"}
                           className="text-xs border-slate-600"
                         >
-                          {clause.riskLevel} Risk
+                          {clause.risk_level} Risk
                         </Badge>
                         <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white">
                           <Highlight className="w-4 h-4" />
@@ -263,14 +322,14 @@ export function DocumentAnalysis({ documentId }: DocumentAnalysisProps) {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {document.complianceChecks.map((check, index) => (
+                {analysis.compliance_checks.map((check, index) => (
                   <div key={index} className="flex items-start space-x-3 p-4 border border-slate-700 rounded-lg">
                     <Shield className={`w-5 h-5 mt-0.5 ${getComplianceColor(check.status)}`} />
                     <div className="flex-1">
                       <div className="flex items-center justify-between mb-2">
                         <h4 className="font-medium text-white">{check.rule}</h4>
                         <Badge
-                          variant={check.status === "Compliant" ? "outline" : "destructive"}
+                          variant={check.status === "compliant" ? "outline" : "destructive"}
                           className="text-xs border-slate-600"
                         >
                           {check.status}
@@ -302,8 +361,9 @@ export function DocumentAnalysis({ documentId }: DocumentAnalysisProps) {
                     </div>
                     <div className="bg-slate-800 p-3 rounded-lg shadow-sm">
                       <p className="text-sm text-slate-300">
-                        I've analyzed your Software License Agreement. I found 3 clauses that need attention, with 1
-                        high-risk intellectual property clause. Would you like me to explain any specific section?
+                        I've analyzed your {analysis.type.toLowerCase()}. I found {analysis.clauses.length} clauses that
+                        need attention, with {analysis.clauses.filter((c) => c.risk_level === "high").length} high-risk
+                        issues. Would you like me to explain any specific section?
                       </p>
                     </div>
                   </div>
@@ -319,7 +379,7 @@ export function DocumentAnalysis({ documentId }: DocumentAnalysisProps) {
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" className="border-slate-600 text-slate-300 hover:bg-slate-700">
-                  Explain IP clause
+                  Explain high-risk clauses
                 </Button>
                 <Button variant="outline" size="sm" className="border-slate-600 text-slate-300 hover:bg-slate-700">
                   Compare to standard

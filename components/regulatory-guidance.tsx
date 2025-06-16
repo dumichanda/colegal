@@ -8,10 +8,27 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Search, BookOpen } from "lucide-react"
 
+interface GuidanceResponse {
+  guidance: string
+  relatedDocuments: Array<{
+    id: string
+    title: string
+    type: string
+  }>
+  relatedRules: Array<{
+    id: string
+    title: string
+    description: string
+    category: string
+  }>
+  confidence: number
+  aiPowered: boolean
+}
+
 export function RegulatoryGuidance() {
   const [query, setQuery] = useState("")
   const [jurisdiction, setJurisdiction] = useState("South Africa")
-  const [guidance, setGuidance] = useState<string | null>(null)
+  const [guidance, setGuidance] = useState<GuidanceResponse | null>(null)
   const [loading, setLoading] = useState(false)
 
   const handleSearch = async () => {
@@ -19,55 +36,25 @@ export function RegulatoryGuidance() {
 
     setLoading(true)
     try {
-      // Simulate API call with mock response
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      const response = await fetch("/api/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, jurisdiction }),
+      })
 
-      setGuidance(`
-**POPIA Compliance Requirements for Financial Services**
+      if (!response.ok) throw new Error("Search failed")
 
-The Protection of Personal Information Act (POPIA) establishes comprehensive data protection requirements for financial institutions in South Africa:
-
-**Key Requirements:**
-
-1. **Lawful Processing (Section 11):**
-   - Establish valid legal grounds for processing personal information
-   - Common grounds include consent, contract performance, and legitimate interests
-   - Financial institutions often rely on contractual necessity and legal obligations
-
-2. **Data Minimisation (Section 12):**
-   - Process only personal information that is adequate, relevant, and not excessive
-   - Limit collection to what is necessary for the specified purpose
-   - Regular review of data collection practices required
-
-3. **Security Safeguards (Section 19):**
-   - Implement appropriate technical and organisational measures
-   - Protect against unauthorised access, loss, or destruction
-   - Regular security assessments and updates required
-
-4. **Cross-Border Transfers (Section 72):**
-   - Ensure adequate level of protection in recipient country
-   - Implement appropriate safeguards for international transfers
-   - Consider adequacy decisions by the Information Regulator
-
-**Compliance Timeline:**
-- POPIA became fully effective on 1 July 2021
-- One-year grace period ended on 30 June 2022
-- Full enforcement and penalties now applicable
-
-**Penalties:**
-- Administrative fines up to R10 million
-- Criminal penalties up to R10 million or 10 years imprisonment
-- Reputational damage and regulatory sanctions
-
-**Recommendations:**
-1. Conduct comprehensive data audit
-2. Update privacy policies and notices
-3. Implement data subject rights procedures
-4. Establish incident response protocols
-5. Provide staff training on POPIA requirements
-      `)
+      const data = await response.json()
+      setGuidance(data.data)
     } catch (error) {
       console.error("Failed to get guidance:", error)
+      setGuidance({
+        guidance: `Unable to fetch guidance for "${query}". Please try again or consult with a qualified legal professional.`,
+        relatedDocuments: [],
+        relatedRules: [],
+        confidence: 0,
+        aiPowered: false,
+      })
     } finally {
       setLoading(false)
     }
@@ -149,19 +136,69 @@ The Protection of Personal Information Act (POPIA) establishes comprehensive dat
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg text-white">Regulatory Guidance</CardTitle>
-              <Badge variant="outline" className="border-slate-600 text-slate-300">
-                {jurisdiction}
-              </Badge>
+              <div className="flex items-center space-x-2">
+                <Badge variant="outline" className="border-slate-600 text-slate-300">
+                  {jurisdiction}
+                </Badge>
+                {guidance.aiPowered && (
+                  <Badge variant="outline" className="border-blue-500 text-blue-300">
+                    AI-Powered
+                  </Badge>
+                )}
+                <Badge variant="outline" className="border-slate-600 text-slate-300">
+                  {guidance.confidence}% Confidence
+                </Badge>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
             <div className="prose prose-sm max-w-none">
-              <div className="whitespace-pre-wrap text-slate-300 leading-relaxed">{guidance}</div>
+              <div className="whitespace-pre-wrap text-slate-300 leading-relaxed">{guidance.guidance}</div>
             </div>
+
+            {/* Related Documents */}
+            {guidance.relatedDocuments.length > 0 && (
+              <div className="mt-6">
+                <h4 className="font-medium text-white mb-3">Related Documents</h4>
+                <div className="space-y-2">
+                  {guidance.relatedDocuments.map((doc) => (
+                    <div key={doc.id} className="p-3 bg-slate-700 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-200">{doc.title}</span>
+                        <Badge variant="outline" className="text-xs border-slate-500 text-slate-300">
+                          {doc.type}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Related Rules */}
+            {guidance.relatedRules.length > 0 && (
+              <div className="mt-6">
+                <h4 className="font-medium text-white mb-3">Related Compliance Rules</h4>
+                <div className="space-y-2">
+                  {guidance.relatedRules.map((rule) => (
+                    <div key={rule.id} className="p-3 bg-slate-700 rounded-lg">
+                      <div className="flex items-start justify-between mb-1">
+                        <span className="text-slate-200 font-medium">{rule.title}</span>
+                        <Badge variant="outline" className="text-xs border-slate-500 text-slate-300">
+                          {rule.category}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-slate-400">{rule.description}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="mt-4 pt-4 border-t border-slate-700">
               <p className="text-xs text-slate-500">
-                This guidance is AI-generated and should be verified with authoritative legal sources. Always consult
-                with qualified legal professionals for specific legal advice.
+                This guidance is {guidance.aiPowered ? "AI-generated and" : ""} should be verified with authoritative
+                legal sources. Always consult with qualified legal professionals for specific legal advice.
               </p>
             </div>
           </CardContent>

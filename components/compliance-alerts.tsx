@@ -1,113 +1,163 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { AlertTriangle } from "lucide-react"
-import { useState } from "react"
-import { CheckCircle } from "lucide-react"
+import { AlertTriangle, Clock, CheckCircle, XCircle } from "lucide-react"
+
+interface ComplianceAlert {
+  id: string
+  title: string
+  description: string
+  priority: "Critical" | "High" | "Medium" | "Low"
+  due_date: string
+  type: string
+  status: string
+  regulation_source?: string
+  jurisdiction?: string
+}
 
 export function ComplianceAlerts() {
-  const [alerts, setAlerts] = useState([
-    {
-      id: 1,
-      title: "POPIA Data Retention Review Due",
-      description: "Annual review of data retention policies required",
-      priority: "High",
-      dueDate: "In 3 days",
-      type: "deadline",
-      status: "pending",
-    },
-    {
-      id: 2,
-      title: "New B-BBEE Regulations",
-      description: "Updated B-BBEE codes effective January 2025",
-      priority: "Medium",
-      dueDate: "6 months",
-      type: "regulatory",
-      status: "pending",
-    },
-    {
-      id: 3,
-      title: "Contract Renewal Alert",
-      description: "Vendor agreement expires next month",
-      priority: "Medium",
-      dueDate: "In 28 days",
-      type: "contract",
-      status: "pending",
-    },
-  ])
+  const [alerts, setAlerts] = useState<ComplianceAlert[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleReview = (alertId: number) => {
-    setAlerts(alerts.map((alert) => (alert.id === alertId ? { ...alert, status: "reviewing" } : alert)))
+  useEffect(() => {
+    fetchAlerts()
+  }, [])
 
-    // Simulate review process
-    setTimeout(() => {
-      setAlerts(alerts.map((alert) => (alert.id === alertId ? { ...alert, status: "reviewed" } : alert)))
-    }, 2000)
+  const fetchAlerts = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch("/api/compliance/alerts")
+      if (!response.ok) {
+        throw new Error("Failed to fetch compliance alerts")
+      }
+      const data = await response.json()
+      setAlerts(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred")
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleDismiss = (alertId: number) => {
-    setAlerts(alerts.filter((alert) => alert.id !== alertId))
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case "Critical":
+        return "destructive"
+      case "High":
+        return "destructive"
+      case "Medium":
+        return "default"
+      case "Low":
+        return "secondary"
+      default:
+        return "secondary"
+    }
+  }
+
+  const getPriorityIcon = (priority: string) => {
+    switch (priority) {
+      case "Critical":
+        return <XCircle className="h-4 w-4" />
+      case "High":
+        return <AlertTriangle className="h-4 w-4" />
+      case "Medium":
+        return <Clock className="h-4 w-4" />
+      case "Low":
+        return <CheckCircle className="h-4 w-4" />
+      default:
+        return <Clock className="h-4 w-4" />
+    }
+  }
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return "No due date"
+    return new Date(dateString).toLocaleDateString("en-ZA", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    })
+  }
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Compliance Alerts</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="animate-pulse">
+                <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Compliance Alerts</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-4">
+            <p className="text-red-600 mb-4">{error}</p>
+            <Button onClick={fetchAlerts} variant="outline">
+              Try Again
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
-    <Card className="bg-slate-800 border-slate-700">
+    <Card>
       <CardHeader>
-        <CardTitle className="text-lg font-semibold text-white">Compliance Alerts</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <AlertTriangle className="h-5 w-5" />
+          Compliance Alerts
+        </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
-          {alerts.map((alert) => (
-            <div key={alert.id} className="flex items-start space-x-3 p-3 border border-slate-700 rounded-lg">
-              <AlertTriangle className="w-5 h-5 mt-0.5 text-yellow-400" />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-1">
-                  <h4 className="text-sm font-medium text-white">{alert.title}</h4>
-                  <Badge
-                    variant={alert.priority === "High" ? "destructive" : "outline"}
-                    className="text-xs border-slate-600"
-                  >
-                    {alert.priority}
-                  </Badge>
-                </div>
-                <p className="text-xs text-slate-400 mb-2">{alert.description}</p>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-slate-500">{alert.dueDate}</span>
-                  <div className="flex space-x-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-xs border-slate-600 text-slate-300 hover:bg-slate-700"
-                      onClick={() => handleReview(alert.id)}
-                      disabled={alert.status === "reviewing" || alert.status === "reviewed"}
-                    >
-                      {alert.status === "reviewing"
-                        ? "Reviewing..."
-                        : alert.status === "reviewed"
-                          ? "Reviewed"
-                          : "Review"}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-xs text-slate-500 hover:text-slate-300"
-                      onClick={() => handleDismiss(alert.id)}
-                    >
-                      ×
-                    </Button>
+        {alerts.length === 0 ? (
+          <div className="text-center py-8">
+            <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
+            <p className="text-gray-600">No compliance alerts at this time</p>
+            <p className="text-sm text-gray-500">All compliance requirements are up to date</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {alerts.map((alert) => (
+              <div key={alert.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      {getPriorityIcon(alert.priority)}
+                      <h4 className="font-medium">{alert.title}</h4>
+                      <Badge variant={getPriorityColor(alert.priority) as any}>{alert.priority}</Badge>
+                    </div>
+                    {alert.description && <p className="text-sm text-gray-600 mb-2">{alert.description}</p>}
+                    <div className="flex items-center gap-4 text-xs text-gray-500">
+                      <span>Due: {formatDate(alert.due_date)}</span>
+                      {alert.regulation_source && <span>Source: {alert.regulation_source}</span>}
+                      {alert.jurisdiction && <span>Jurisdiction: {alert.jurisdiction}</span>}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
-          {alerts.length === 0 && (
-            <div className="text-center py-8">
-              <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-2" />
-              <p className="text-slate-300">All alerts reviewed!</p>
-            </div>
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   )
