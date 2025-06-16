@@ -1,28 +1,127 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Progress } from "@/components/ui/progress"
-import { GitCompare, Download, AlertTriangle, CheckCircle, Clock } from "lucide-react"
+import { GitCompare, Download, AlertTriangle, CheckCircle, Clock, Loader2 } from "lucide-react"
+
+interface Document {
+  id: string
+  title: string
+  type: string
+  status: string
+  created_at: string
+}
 
 export function ContractComparison() {
   const [selectedDocuments, setSelectedDocuments] = useState<string[]>([])
   const [comparisonResult, setComparisonResult] = useState<any>(null)
   const [isComparing, setIsComparing] = useState(false)
+  const [availableDocuments, setAvailableDocuments] = useState<Document[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const availableDocuments = [
-    { id: "doc-1", title: "Software License Agreement - TechCorp v1.0", type: "Contract" },
-    { id: "doc-2", title: "Software License Agreement - TechCorp v2.0", type: "Contract" },
-    { id: "doc-3", title: "Standard Software License Template", type: "Template" },
-    { id: "doc-4", title: "Employment Agreement - Senior Developer", type: "Contract" },
-    { id: "doc-5", title: "Vendor Service Agreement - CloudProvider", type: "Contract" },
-  ]
+  // Fetch available documents from API
+  useEffect(() => {
+    const fetchDocuments = async () => {
+      try {
+        console.log("Fetching documents for contract comparison...")
+        setIsLoading(true)
 
-  const mockComparisonResult = {
+        const response = await fetch("/api/documents")
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+
+        const data = await response.json()
+        console.log("Documents fetched:", data)
+
+        if (data.success && Array.isArray(data.data)) {
+          setAvailableDocuments(data.data)
+        } else if (Array.isArray(data)) {
+          setAvailableDocuments(data)
+        } else {
+          console.warn("Unexpected data format:", data)
+          setAvailableDocuments([])
+        }
+      } catch (error) {
+        console.error("Error fetching documents:", error)
+        setError("Failed to load documents")
+        // Fallback data for demo purposes
+        setAvailableDocuments([
+          {
+            id: "demo-1",
+            title: "Software License Agreement - TechCorp v1.0",
+            type: "Contract",
+            status: "completed",
+            created_at: new Date().toISOString(),
+          },
+          {
+            id: "demo-2",
+            title: "Software License Agreement - TechCorp v2.0",
+            type: "Contract",
+            status: "completed",
+            created_at: new Date().toISOString(),
+          },
+        ])
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchDocuments()
+  }, [])
+
+  const handleCompare = async () => {
+    if (selectedDocuments.length < 2) return
+
+    console.log("Starting document comparison:", selectedDocuments)
+    setIsComparing(true)
+    setError(null)
+
+    try {
+      // Make API call to compare documents
+      const response = await fetch("/api/documents/compare", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          document1Id: selectedDocuments[0],
+          document2Id: selectedDocuments[1],
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Comparison failed: ${response.status}`)
+      }
+
+      const result = await response.json()
+      console.log("Comparison result:", result)
+
+      if (result.success) {
+        setComparisonResult(result.data)
+      } else {
+        throw new Error(result.error || "Comparison failed")
+      }
+    } catch (error) {
+      console.error("Comparison error:", error)
+      setError("Comparison failed. Using demo data.")
+
+      // Fallback to mock data for demo
+      setTimeout(() => {
+        setComparisonResult(getMockComparisonResult())
+      }, 1000)
+    } finally {
+      setIsComparing(false)
+    }
+  }
+
+  const getMockComparisonResult = () => ({
     summary: {
       totalChanges: 23,
       highRiskChanges: 3,
@@ -88,31 +187,7 @@ export function ContractComparison() {
         present: true,
       },
     ],
-  }
-
-  const handleCompare = async () => {
-    if (selectedDocuments.length < 2) return
-
-    setIsComparing(true)
-    // Simulate API call
-    setTimeout(() => {
-      setComparisonResult(mockComparisonResult)
-      setIsComparing(false)
-    }, 3000)
-  }
-
-  const getRiskColor = (risk: string) => {
-    switch (risk) {
-      case "High":
-        return "border-red-500/30 bg-red-500/10"
-      case "Medium":
-        return "border-yellow-500/30 bg-yellow-500/10"
-      case "Low":
-        return "border-green-500/30 bg-green-500/10"
-      default:
-        return "border-slate-600 bg-slate-700/30"
-    }
-  }
+  })
 
   const getChangeIcon = (changeType: string) => {
     switch (changeType) {
@@ -127,8 +202,23 @@ export function ContractComparison() {
     }
   }
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+        <span className="ml-2 text-slate-400">Loading documents...</span>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+          <p className="text-yellow-400 text-sm">{error}</p>
+        </div>
+      )}
+
       {/* Document Selection */}
       <Card>
         <CardHeader>
@@ -180,9 +270,21 @@ export function ContractComparison() {
           </div>
 
           <div className="flex justify-between items-center">
-            <div className="text-sm text-gray-600">{selectedDocuments.length}/2 documents selected</div>
+            <div className="text-sm text-gray-600">
+              {selectedDocuments.length}/2 documents selected
+              {availableDocuments.length > 0 && (
+                <span className="ml-2 text-slate-400">({availableDocuments.length} available)</span>
+              )}
+            </div>
             <Button onClick={handleCompare} disabled={selectedDocuments.length < 2 || isComparing}>
-              {isComparing ? "Comparing..." : "Compare Documents"}
+              {isComparing ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Comparing...
+                </>
+              ) : (
+                "Compare Documents"
+              )}
             </Button>
           </div>
 

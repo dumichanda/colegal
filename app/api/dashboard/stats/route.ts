@@ -1,66 +1,126 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { neon } from "@neondatabase/serverless"
+import { NextResponse } from "next/server"
+import { sql } from "@/lib/database"
 
-const sql = neon(process.env.DATABASE_URL!)
-
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
   try {
-    console.log("Dashboard stats API called")
+    const { searchParams } = new URL(request.url)
+    const organizationId = searchParams.get("organization_id")
 
-    // Get total documents
-    const totalDocsResult = await sql`SELECT COUNT(*) as count FROM documents`
-    const totalDocuments = Number(totalDocsResult[0]?.count || 0)
+    console.log("🔄 Fetching dashboard statistics from database...")
 
-    // Get pending reviews (documents with status 'pending')
-    const pendingResult = await sql`SELECT COUNT(*) as count FROM documents WHERE status = 'pending'`
-    const pendingReviews = Number(pendingResult[0]?.count || 0)
-
-    // Get compliance score (percentage of compliant items)
-    const complianceResult = await sql`
-      SELECT 
-        COUNT(*) as total,
-        COUNT(CASE WHEN status = 'compliant' THEN 1 END) as compliant
-      FROM compliance_monitoring
-    `
-    const complianceData = complianceResult[0]
-    const complianceScore =
-      complianceData?.total > 0
-        ? Math.round((Number(complianceData.compliant) / Number(complianceData.total)) * 100)
-        : 85 // Default fallback
-
-    // Get active alerts (non-compliant items)
-    const alertsResult = await sql`
-      SELECT COUNT(*) as count 
-      FROM compliance_monitoring 
-      WHERE status IN ('non_compliant', 'at_risk')
-    `
-    const activeAlerts = Number(alertsResult[0]?.count || 0)
-
-    const stats = {
-      totalDocuments,
-      pendingReviews,
-      complianceScore,
-      activeAlerts,
+    if (!sql) {
+      throw new Error("Database connection not available")
     }
 
-    console.log("Dashboard stats result:", stats)
+    // Get document statistics
+    const documentStats = await sql`
+      SELECT 
+        COUNT(*) as total_documents,
+        COUNT(CASE WHEN status = 'active' THEN 1 END) as active_documents,
+        COUNT(CASE WHEN created_at >= NOW() - INTERVAL '30 days' THEN 1 END) as recent_documents
+      FROM documents
+      WHERE (${organizationId}::text IS NULL OR organization_id = ${organizationId})
+    `
 
-    return NextResponse.json({
-      success: true,
-      data: stats,
-    })
-  } catch (error) {
-    console.error("Dashboard stats error:", error)
+    // Get compliance statistics
+    const complianceStats = await sql`
+      SELECT 
+        COUNT(*) as total_alerts,
+        COUNT(CASE WHEN status = 'active' THEN 1 END) as active_alerts,
+        COUNT(CASE WHEN priority = 'Critical' THEN 1 END) as critical_alerts,
+        COUNT(CASE WHEN due_date < NOW() THEN 1 END) as overdue_alerts
+      FROM compliance_alerts
+      WHERE (${organizationId}::text IS NULL OR organization_id = ${organizationId})
+    `
 
-    // Return fallback data instead of error
+    // Get task statistics
+    const taskStats = await sql`
+      SELECT 
+        COUNT(*) as total_tasks,
+        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_tasks,
+        COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_tasks,
+        COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_tasks
+      FROM tasks
+      WHERE (${organizationId}::text IS NULL OR organization_id = ${organizationId})
+    `
+
+    // Get recent activity
+    const recentActivity = await sql`
+      SELECT 
+        'document' as type,
+        title as name,
+        created_at,
+        status
+      FROM documents
+      WHERE (${organizationId}::text IS NULL OR organization_id = ${organizationId})
+      UNION ALL
+      SELECT 
+        'alert' as type,
+        title as name,
+        created_at,
+        status
+      FROM compliance_alerts
+      WHERE (${organizationId}::text IS NULL OR organization_id = ${organizationId})
+      ORDER BY created_at DESC
+      LIMIT 10
+    `
+
+    const docStats = documentStats[0]
+    const compStats = complianceStats[0]
+    const tskStats = taskStats[0]
+
+    // Calculate derived metrics
+    const complianceRate =
+      compStats.total_alerts > 0
+        ? Math.round(((compStats.total_alerts - compStats.active_alerts) / compStats.total_alerts) * 100)
+        : 100
+
+    const taskCompletionRate =
+      tskStats.total_tasks > 0 ? Math.round((tskStats.completed_tasks / tskStats.total_tasks) * 100) : 0
+
+    console.log(`✅ Dashboard stats: ${docStats.total_documents} docs, ${compStats.total_alerts} alerts`)
+
     return NextResponse.json({
       success: true,
       data: {
-        totalDocuments: 0,
-        pendingReviews: 0,
-        complianceScore: 0,
-        activeAlerts: 0,
+        documents: {
+          total: Number(docStats.total_documents),
+          active: Number(docStats.active_documents),
+          recent: Number(docStats.recent_documents),
+        },
+        compliance: {
+          totalAlerts: Number(compStats.total_alerts),
+          activeAlerts: Number(compStats.active_alerts),
+          criticalAlerts: Number(compStats.critical_alerts),
+          overdueAlerts: Number(compStats.overdue_alerts),
+          complianceRate,
+        },
+        tasks: {
+          total: Number(tskStats.total_tasks),
+          pending: Number(tskStats.pending_tasks),
+          completed: Number(tskStats.completed_tasks),
+          failed: Number(tskStats.failed_tasks),
+          completionRate: taskCompletionRate,
+        },
+        recentActivity: recentActivity.map((activity) => ({
+          type: activity.type,
+          name: activity.name,
+          createdAt: activity.created_at,
+          status: activity.status,
+        })),
       },
+      timestamp: new Date().toISOString(),
     })
+  } catch (error) {
+    console.error("❌ Error fetching dashboard statistics:", error)
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to fetch dashboard statistics",
+        data: null,
+      },
+      { status: 500 },
+    )
   }
 }

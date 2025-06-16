@@ -1,139 +1,94 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Calendar, Download, Share } from "lucide-react"
 
+interface Document {
+  id: string
+  title: string
+  type: string
+}
+
+interface TimelineData {
+  title: string
+  totalEvents: number
+  dateRange: { start: string; end: string }
+  events: Array<{
+    id: number
+    date: string
+    title: string
+    description: string
+    category: string
+    importance: string
+    source: string
+    page: number
+    evidence: string[]
+  }>
+  milestones: Array<{
+    date: string
+    title: string
+    type: string
+  }>
+  categories: Array<{
+    name: string
+    count: number
+    color: string
+  }>
+}
+
 export function TimelineBuilder() {
+  const [availableDocuments, setAvailableDocuments] = useState<Document[]>([])
   const [selectedDocuments, setSelectedDocuments] = useState<string[]>([])
-  const [timelineData, setTimelineData] = useState<any>(null)
+  const [timelineData, setTimelineData] = useState<TimelineData | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [loading, setLoading] = useState(true)
 
-  const availableDocuments = [
-    { id: "doc-1", title: "Software License Agreement - TechCorp", type: "Contract" },
-    { id: "doc-2", title: "Employment Agreement - Senior Developer", type: "Contract" },
-    { id: "doc-3", title: "Email Chain - Project Discussions", type: "Communication" },
-    { id: "doc-4", title: "Meeting Minutes - Board Meeting", type: "Minutes" },
-    { id: "doc-5", title: "Patent Filing Documents", type: "Legal Filing" },
-  ]
+  useEffect(() => {
+    fetchDocuments()
+  }, [])
 
-  const mockTimelineData = {
-    title: "Patent Infringement Case Timeline",
-    totalEvents: 24,
-    dateRange: { start: "2023-01-15", end: "2024-12-10" },
-    events: [
-      {
-        id: 1,
-        date: "2023-01-15",
-        title: "Initial Patent Filing",
-        description: "XYZ Corp files patent application for innovative software algorithm",
-        category: "Patent",
-        importance: "High",
-        source: "Patent Filing Documents",
-        page: 1,
-        evidence: ["Patent application #12345678", "Technical specifications"],
-      },
-      {
-        id: 2,
-        date: "2023-03-22",
-        title: "Competitor Product Development Begins",
-        description: "ABC Inc. starts development of competing product with similar functionality",
-        category: "Development",
-        importance: "High",
-        source: "Email Chain - Project Discussions",
-        page: 15,
-        evidence: ["Email from CTO to development team", "Project kickoff meeting notes"],
-      },
-      {
-        id: 3,
-        date: "2023-06-10",
-        title: "Patent Granted",
-        description: "USPTO grants patent to XYZ Corp after examination",
-        category: "Patent",
-        importance: "Critical",
-        source: "Patent Filing Documents",
-        page: 45,
-        evidence: ["Patent grant certificate", "USPTO correspondence"],
-      },
-      {
-        id: 4,
-        date: "2023-08-15",
-        title: "Competitor Product Launch",
-        description: "ABC Inc. launches product with allegedly infringing features",
-        category: "Product Launch",
-        importance: "Critical",
-        source: "Meeting Minutes - Board Meeting",
-        page: 8,
-        evidence: ["Product announcement", "Marketing materials", "Technical documentation"],
-      },
-      {
-        id: 5,
-        date: "2023-10-03",
-        title: "Cease and Desist Letter Sent",
-        description: "XYZ Corp sends formal notice of patent infringement to ABC Inc.",
-        category: "Legal Action",
-        importance: "High",
-        source: "Legal Correspondence",
-        page: 2,
-        evidence: ["Cease and desist letter", "Delivery confirmation"],
-      },
-      {
-        id: 6,
-        date: "2023-11-20",
-        title: "Settlement Negotiations Begin",
-        description: "Parties engage in preliminary settlement discussions",
-        category: "Settlement",
-        importance: "Medium",
-        source: "Email Chain - Legal Discussions",
-        page: 23,
-        evidence: ["Settlement proposal", "Counter-proposal", "Meeting notes"],
-      },
-      {
-        id: 7,
-        date: "2024-01-12",
-        title: "Lawsuit Filed",
-        description: "XYZ Corp files patent infringement lawsuit in federal court",
-        category: "Litigation",
-        importance: "Critical",
-        source: "Court Filing",
-        page: 1,
-        evidence: ["Complaint", "Filing receipt", "Summons"],
-      },
-      {
-        id: 8,
-        date: "2024-12-10",
-        title: "Discovery Phase Begins",
-        description: "Court orders commencement of discovery proceedings",
-        category: "Discovery",
-        importance: "High",
-        source: "Court Order",
-        page: 3,
-        evidence: ["Discovery order", "Scheduling conference notes"],
-      },
-    ],
-    milestones: [
-      { date: "2023-06-10", title: "Patent Granted", type: "Patent" },
-      { date: "2023-08-15", title: "Product Launch", type: "Infringement" },
-      { date: "2024-01-12", title: "Lawsuit Filed", type: "Litigation" },
-    ],
-    categories: [
-      { name: "Patent", count: 3, color: "blue" },
-      { name: "Development", count: 4, color: "green" },
-      { name: "Legal Action", count: 6, color: "red" },
-      { name: "Settlement", count: 2, color: "yellow" },
-      { name: "Litigation", count: 9, color: "purple" },
-    ],
+  const fetchDocuments = async () => {
+    try {
+      console.log("🔄 Fetching documents for timeline...")
+      setLoading(true)
+      const response = await fetch("/api/documents")
+      if (!response.ok) throw new Error("Failed to fetch documents")
+      const data = await response.json()
+      console.log("✅ Documents received:", data)
+      setAvailableDocuments(Array.isArray(data) ? data : [])
+    } catch (error) {
+      console.error("❌ Error fetching documents:", error)
+      setAvailableDocuments([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleGenerateTimeline = async () => {
-    setIsGenerating(true)
-    // Simulate API call
-    setTimeout(() => {
-      setTimelineData(mockTimelineData)
+    if (selectedDocuments.length === 0) return
+
+    try {
+      console.log("🔄 Generating timeline for documents:", selectedDocuments)
+      setIsGenerating(true)
+
+      const response = await fetch("/api/timeline/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ documentIds: selectedDocuments }),
+      })
+
+      if (!response.ok) throw new Error("Failed to generate timeline")
+      const data = await response.json()
+      console.log("✅ Timeline generated:", data)
+      setTimelineData(data.success ? data.data : null)
+    } catch (error) {
+      console.error("❌ Error generating timeline:", error)
+    } finally {
       setIsGenerating(false)
-    }, 3000)
+    }
   }
 
   const getImportanceColor = (importance: string) => {
@@ -164,6 +119,29 @@ export function TimelineBuilder() {
     return colors[category] || "bg-gray-500"
   }
 
+  if (loading) {
+    return (
+      <Card className="bg-slate-800 border-slate-700">
+        <CardHeader>
+          <CardTitle className="flex items-center text-white">
+            <Calendar className="w-5 h-5 mr-2" />
+            Timeline Builder
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="animate-pulse space-y-4">
+            <div className="h-4 bg-slate-700 rounded w-1/2"></div>
+            <div className="grid grid-cols-2 gap-2">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-16 bg-slate-700 rounded"></div>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Timeline Configuration */}
@@ -177,35 +155,46 @@ export function TimelineBuilder() {
         <CardContent className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-2 text-slate-300">Select Documents for Timeline</label>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {availableDocuments.map((doc) => (
-                <label
-                  key={doc.id}
-                  className="flex items-center space-x-2 p-2 border border-slate-600 rounded cursor-pointer hover:bg-slate-700"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedDocuments.includes(doc.id)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedDocuments([...selectedDocuments, doc.id])
-                      } else {
-                        setSelectedDocuments(selectedDocuments.filter((id) => id !== doc.id))
-                      }
-                    }}
-                  />
-                  <div className="flex-1">
-                    <div className="text-sm font-medium text-white">{doc.title}</div>
-                    <div className="text-xs text-slate-400">{doc.type}</div>
-                  </div>
-                </label>
-              ))}
-            </div>
+            {availableDocuments.length === 0 ? (
+              <div className="text-center py-8 text-slate-400">
+                <Calendar className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>No documents available</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {availableDocuments.map((doc) => (
+                  <label
+                    key={doc.id}
+                    className="flex items-center space-x-2 p-2 border border-slate-600 rounded cursor-pointer hover:bg-slate-700"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedDocuments.includes(doc.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedDocuments([...selectedDocuments, doc.id])
+                        } else {
+                          setSelectedDocuments(selectedDocuments.filter((id) => id !== doc.id))
+                        }
+                      }}
+                    />
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-white">{doc.title}</div>
+                      <div className="text-xs text-slate-400">{doc.type}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex justify-between items-center">
             <div className="text-sm text-slate-400">{selectedDocuments.length} documents selected</div>
-            <Button onClick={handleGenerateTimeline} disabled={selectedDocuments.length === 0 || isGenerating}>
+            <Button
+              onClick={handleGenerateTimeline}
+              disabled={selectedDocuments.length === 0 || isGenerating}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
               {isGenerating ? "Generating..." : "Generate Timeline"}
             </Button>
           </div>
@@ -256,7 +245,7 @@ export function TimelineBuilder() {
               <div className="mt-6">
                 <h4 className="font-medium mb-3 text-white">Event Categories</h4>
                 <div className="flex flex-wrap gap-2">
-                  {timelineData.categories.map((category: any) => (
+                  {timelineData.categories.map((category) => (
                     <div key={category.name} className="flex items-center space-x-2">
                       <div className={`w-3 h-3 rounded-full ${getCategoryColor(category.name)}`}></div>
                       <span className="text-sm text-slate-300">
@@ -281,7 +270,7 @@ export function TimelineBuilder() {
 
                 {/* Timeline Events */}
                 <div className="space-y-6">
-                  {timelineData.events.map((event: any, index: number) => (
+                  {timelineData.events.map((event) => (
                     <div key={event.id} className="relative flex items-start space-x-4">
                       {/* Timeline Dot */}
                       <div className="relative z-10">
@@ -317,7 +306,7 @@ export function TimelineBuilder() {
                           <div className="mt-3">
                             <div className="text-xs font-medium text-slate-300 mb-1">Evidence:</div>
                             <div className="flex flex-wrap gap-1">
-                              {event.evidence.map((evidence: string, idx: number) => (
+                              {event.evidence.map((evidence, idx) => (
                                 <Badge key={idx} variant="outline" className="text-xs border-slate-500 text-slate-300">
                                   {evidence}
                                 </Badge>
@@ -340,7 +329,7 @@ export function TimelineBuilder() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {timelineData.milestones.map((milestone: any, index: number) => (
+                {timelineData.milestones.map((milestone, index) => (
                   <div key={index} className="p-4 border border-slate-600 rounded-lg text-center">
                     <div className="text-lg font-bold text-white">{milestone.title}</div>
                     <div className="text-sm text-slate-400">{new Date(milestone.date).toLocaleDateString()}</div>

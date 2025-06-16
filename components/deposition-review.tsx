@@ -1,125 +1,133 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
-import { Progress } from "@/components/ui/progress"
-import { FileText, Search, Clock, User, AlertTriangle, Star } from "lucide-react"
+import { FileText, Search, Clock, User, Star } from "lucide-react"
+
+interface Deposition {
+  id: string
+  title: string
+  date: string
+  witness: string
+  role: string
+  pages: number
+  duration: string
+  status: string
+}
+
+interface AnalysisResult {
+  summary: {
+    totalPages: number
+    keyTestimonySegments: number
+    credibilityScore: number
+    inconsistencies: number
+    importantAdmissions: number
+  }
+  keyTestimony: Array<{
+    id: number
+    page: number
+    lineStart: number
+    lineEnd: number
+    topic: string
+    importance: string
+    content: string
+    analysis: string
+    tags: string[]
+  }>
+  timeline: Array<{
+    date: string
+    event: string
+    page: number
+    importance: string
+  }>
+  credibilityAnalysis: {
+    overallScore: number
+    factors: Array<{
+      factor: string
+      score: number
+      notes: string
+    }>
+    redFlags: string[]
+  }
+}
 
 export function DepositionReview() {
+  const [depositions, setDepositions] = useState<Deposition[]>([])
   const [selectedDeposition, setSelectedDeposition] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
-  const [analysisResult, setAnalysisResult] = useState<any>(null)
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [analyzing, setAnalyzing] = useState(false)
 
-  const depositions = [
-    {
-      id: "dep-1",
-      title: "John Smith Deposition - Patent Infringement Case",
-      date: "2024-12-10",
-      witness: "John Smith",
-      role: "Former CTO",
-      pages: 287,
-      duration: "6h 23m",
-      status: "Analyzed",
-    },
-    {
-      id: "dep-2",
-      title: "Sarah Johnson Deposition - Employment Dispute",
-      date: "2024-12-08",
-      witness: "Sarah Johnson",
-      role: "HR Director",
-      pages: 156,
-      duration: "3h 45m",
-      status: "Processing",
-    },
-    {
-      id: "dep-3",
-      title: "Michael Chen Deposition - Contract Breach",
-      date: "2024-12-05",
-      witness: "Michael Chen",
-      role: "Project Manager",
-      pages: 203,
-      duration: "4h 12m",
-      status: "Analyzed",
-    },
-  ]
+  useEffect(() => {
+    fetchDepositions()
+  }, [])
 
-  const mockAnalysisResult = {
-    summary: {
-      totalPages: 287,
-      keyTestimonySegments: 23,
-      credibilityScore: 78,
-      inconsistencies: 4,
-      importantAdmissions: 7,
-    },
-    keyTestimony: [
-      {
-        id: 1,
-        page: 45,
-        lineStart: 12,
-        lineEnd: 18,
-        topic: "Knowledge of Patent",
-        importance: "High",
-        content:
-          "Q: Were you aware of the XYZ patent when developing the competing product? A: Yes, I was familiar with it. We discussed it in several team meetings.",
-        analysis: "Direct admission of knowledge - crucial for willful infringement claim",
-        tags: ["Patent Knowledge", "Willful Infringement", "Key Admission"],
-      },
-      {
-        id: 2,
-        page: 78,
-        lineStart: 5,
-        lineEnd: 12,
-        topic: "Timeline of Development",
-        importance: "Medium",
-        content:
-          "Q: When did development begin? A: We started the initial design work in March 2023, but serious development didn't begin until June.",
-        analysis: "Establishes timeline - important for damages calculation",
-        tags: ["Timeline", "Development", "Damages"],
-      },
-      {
-        id: 3,
-        page: 156,
-        lineStart: 20,
-        lineEnd: 25,
-        topic: "Communication with Legal",
-        importance: "High",
-        content:
-          "Q: Did you consult with legal counsel about potential patent issues? A: I mentioned it to our legal team, but they said to proceed.",
-        analysis: "Potential advice of counsel defense - need to explore further",
-        tags: ["Legal Advice", "Defense Strategy", "Privilege Issues"],
-      },
-    ],
-    timeline: [
-      { date: "March 2023", event: "Initial design discussions", page: 78, importance: "Medium" },
-      { date: "June 2023", event: "Serious development begins", page: 78, importance: "High" },
-      { date: "August 2023", event: "Patent discussion with legal", page: 156, importance: "High" },
-      { date: "October 2023", event: "Product launch", page: 203, importance: "High" },
-    ],
-    credibilityAnalysis: {
-      overallScore: 78,
-      factors: [
-        { factor: "Consistency", score: 82, notes: "Generally consistent responses" },
-        { factor: "Detail Level", score: 75, notes: "Good detail on technical matters" },
-        { factor: "Evasiveness", score: 70, notes: "Some evasive answers on key topics" },
-        { factor: "Memory", score: 85, notes: "Strong recall of technical details" },
-      ],
-      redFlags: [
-        "Inconsistent testimony about meeting dates on pages 45 and 67",
-        "Vague responses when asked about specific conversations with competitors",
-      ],
-    },
+  const fetchDepositions = async () => {
+    try {
+      console.log("🔄 Fetching depositions...")
+      setLoading(true)
+      const response = await fetch("/api/depositions")
+      if (!response.ok) throw new Error("Failed to fetch depositions")
+      const data = await response.json()
+      console.log("✅ Depositions received:", data)
+      setDepositions(data.success ? data.data : [])
+    } catch (error) {
+      console.error("❌ Error fetching depositions:", error)
+      setDepositions([])
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleAnalyze = (depositionId: string) => {
-    setSelectedDeposition(depositionId)
-    // Simulate analysis
-    setTimeout(() => {
-      setAnalysisResult(mockAnalysisResult)
-    }, 2000)
+  const handleAnalyze = async (depositionId: string) => {
+    try {
+      console.log("🔄 Analyzing deposition:", depositionId)
+      setSelectedDeposition(depositionId)
+      setAnalyzing(true)
+
+      const response = await fetch("/api/depositions/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ depositionId }),
+      })
+
+      if (!response.ok) throw new Error("Failed to analyze deposition")
+      const data = await response.json()
+      console.log("✅ Deposition analysis received:", data)
+      setAnalysisResult(data.success ? data.data : null)
+    } catch (error) {
+      console.error("❌ Error analyzing deposition:", error)
+    } finally {
+      setAnalyzing(false)
+    }
+  }
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim() || !selectedDeposition) return
+
+    try {
+      console.log("🔄 Searching deposition transcript...")
+      const response = await fetch("/api/depositions/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          depositionId: selectedDeposition,
+          query: searchQuery,
+        }),
+      })
+
+      if (!response.ok) throw new Error("Failed to search transcript")
+      const data = await response.json()
+      console.log("✅ Search results received:", data)
+      // Handle search results here
+    } catch (error) {
+      console.error("❌ Error searching transcript:", error)
+    }
   }
 
   const getImportanceColor = (importance: string) => {
@@ -135,6 +143,29 @@ export function DepositionReview() {
     }
   }
 
+  if (loading) {
+    return (
+      <Card className="bg-slate-800 border-slate-700">
+        <CardHeader>
+          <CardTitle className="flex items-center text-white">
+            <FileText className="w-5 h-5 mr-2" />
+            Deposition Review
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="animate-pulse p-4 border border-slate-600 rounded-lg">
+                <div className="h-4 bg-slate-700 rounded w-3/4 mb-2"></div>
+                <div className="h-3 bg-slate-700 rounded w-1/2"></div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Deposition List */}
@@ -147,47 +178,63 @@ export function DepositionReview() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {depositions.map((dep) => (
-              <div
-                key={dep.id}
-                className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                  selectedDeposition === dep.id
-                    ? "bg-blue-500/10 border-blue-500/50"
-                    : "border-slate-600 hover:bg-slate-700/50 hover:border-slate-500"
-                }`}
-                onClick={() => handleAnalyze(dep.id)}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <h3 className="font-medium text-white mb-2">{dep.title}</h3>
-                    <div className="flex items-center space-x-4 text-sm text-slate-300 mb-2">
-                      <div className="flex items-center">
-                        <User className="w-4 h-4 mr-1" />
-                        <span className="text-slate-200">{dep.witness}</span>
-                        <span className="text-slate-400 ml-1">({dep.role})</span>
+            {depositions.length === 0 ? (
+              <div className="text-center py-8 text-slate-400">
+                <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>No depositions available</p>
+              </div>
+            ) : (
+              depositions.map((dep) => (
+                <div
+                  key={dep.id}
+                  className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                    selectedDeposition === dep.id
+                      ? "bg-blue-500/10 border-blue-500/50"
+                      : "border-slate-600 hover:bg-slate-700/50 hover:border-slate-500"
+                  }`}
+                  onClick={() => handleAnalyze(dep.id)}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h3 className="font-medium text-white mb-2">{dep.title}</h3>
+                      <div className="flex items-center space-x-4 text-sm text-slate-300 mb-2">
+                        <div className="flex items-center">
+                          <User className="w-4 h-4 mr-1" />
+                          <span className="text-slate-200">{dep.witness}</span>
+                          <span className="text-slate-400 ml-1">({dep.role})</span>
+                        </div>
+                        <div className="flex items-center">
+                          <Clock className="w-4 h-4 mr-1" />
+                          <span className="text-slate-200">{dep.duration}</span>
+                        </div>
+                        <span className="text-slate-200">{dep.pages} pages</span>
                       </div>
-                      <div className="flex items-center">
-                        <Clock className="w-4 h-4 mr-1" />
-                        <span className="text-slate-200">{dep.duration}</span>
-                      </div>
-                      <span className="text-slate-200">{dep.pages} pages</span>
+                      <div className="text-sm text-slate-300">{dep.date}</div>
                     </div>
-                    <div className="text-sm text-slate-300">{dep.date}</div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Badge
-                      variant={dep.status === "Analyzed" ? "default" : "secondary"}
-                      className="bg-slate-700 text-slate-200 border-slate-600"
-                    >
-                      {dep.status}
-                    </Badge>
-                    <Button variant="outline" size="sm" className="border-slate-600 text-slate-200 hover:bg-slate-700">
-                      {dep.status === "Analyzed" ? "View Analysis" : "Analyze"}
-                    </Button>
+                    <div className="flex items-center space-x-2">
+                      <Badge
+                        variant={dep.status === "Analyzed" ? "default" : "secondary"}
+                        className="bg-slate-700 text-slate-200 border-slate-600"
+                      >
+                        {dep.status}
+                      </Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-slate-600 text-slate-200 hover:bg-slate-700"
+                        disabled={analyzing && selectedDeposition === dep.id}
+                      >
+                        {analyzing && selectedDeposition === dep.id
+                          ? "Analyzing..."
+                          : dep.status === "Analyzed"
+                            ? "View Analysis"
+                            : "Analyze"}
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </CardContent>
       </Card>
@@ -244,7 +291,7 @@ export function DepositionReview() {
             </TabsList>
 
             <TabsContent value="testimony" className="space-y-4 p-6">
-              {analysisResult.keyTestimony.map((testimony: any) => (
+              {analysisResult.keyTestimony.map((testimony) => (
                 <Card key={testimony.id} className="bg-slate-700 border-slate-600">
                   <CardContent className="p-6">
                     <div className="flex items-start justify-between mb-4">
@@ -274,7 +321,7 @@ export function DepositionReview() {
                     </div>
 
                     <div className="flex flex-wrap gap-2">
-                      {testimony.tags.map((tag: string, index: number) => (
+                      {testimony.tags.map((tag, index) => (
                         <Badge key={index} variant="outline" className="text-xs border-slate-500 text-slate-300">
                           {tag}
                         </Badge>
@@ -283,81 +330,6 @@ export function DepositionReview() {
                   </CardContent>
                 </Card>
               ))}
-            </TabsContent>
-
-            <TabsContent value="timeline" className="p-6">
-              <Card className="bg-slate-700 border-slate-600">
-                <CardHeader>
-                  <CardTitle className="text-white">Case Timeline</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {analysisResult.timeline.map((event: any, index: number) => (
-                      <div
-                        key={index}
-                        className="flex items-start space-x-4 pb-4 border-b border-slate-600 last:border-b-0"
-                      >
-                        <div className="w-24 text-sm font-medium text-slate-300">{event.date}</div>
-                        <div className="flex-1">
-                          <div className="font-medium text-white">{event.event}</div>
-                          <div className="text-sm text-slate-300">Referenced on page {event.page}</div>
-                        </div>
-                        <Badge
-                          variant={getImportanceColor(event.importance)}
-                          className="bg-slate-600 text-slate-200 border-slate-500"
-                        >
-                          {event.importance}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="credibility" className="p-6">
-              <Card className="bg-slate-700 border-slate-600">
-                <CardHeader>
-                  <CardTitle className="text-white">Credibility Analysis</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="text-center">
-                    <div className="text-4xl font-bold text-white mb-2">
-                      {analysisResult.credibilityAnalysis.overallScore}%
-                    </div>
-                    <div className="text-slate-300">Overall Credibility Score</div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h4 className="font-medium text-white">Credibility Factors</h4>
-                    {analysisResult.credibilityAnalysis.factors.map((factor: any, index: number) => (
-                      <div key={index} className="space-y-2">
-                        <div className="flex justify-between">
-                          <span className="font-medium text-white">{factor.factor}</span>
-                          <span className="text-slate-200">{factor.score}%</span>
-                        </div>
-                        <Progress value={factor.score} className="bg-slate-600" />
-                        <div className="text-sm text-slate-300">{factor.notes}</div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="space-y-3">
-                    <h4 className="font-medium flex items-center text-white">
-                      <AlertTriangle className="w-4 h-4 mr-2 text-red-400" />
-                      Red Flags
-                    </h4>
-                    {analysisResult.credibilityAnalysis.redFlags.map((flag: string, index: number) => (
-                      <div
-                        key={index}
-                        className="p-3 bg-red-500/10 border border-red-500/30 rounded text-sm text-slate-200"
-                      >
-                        {flag}
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
             </TabsContent>
 
             <TabsContent value="search" className="p-6">
@@ -375,16 +347,18 @@ export function DepositionReview() {
                         className="pl-10 bg-slate-600 border-slate-500 text-white placeholder:text-slate-400"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
+                        onKeyPress={(e) => e.key === "Enter" && handleSearch()}
                       />
                     </div>
-                    <Button className="bg-blue-600 hover:bg-blue-700">Search</Button>
+                    <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleSearch}>
+                      Search
+                    </Button>
                   </div>
 
                   <div className="text-sm text-slate-300">
-                    Search across 287 pages of testimony for specific topics, keywords, or phrases.
+                    Search across deposition transcript for specific topics, keywords, or phrases.
                   </div>
 
-                  {/* Search results would appear here */}
                   <div className="bg-slate-600 p-4 rounded text-center text-slate-300">
                     Enter a search term to find relevant testimony
                   </div>
