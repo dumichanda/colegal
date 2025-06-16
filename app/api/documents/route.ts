@@ -1,134 +1,60 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { neon } from "@neondatabase/serverless"
-
-const sql = neon(process.env.DATABASE_URL!)
+import { getDocuments, createDocument } from "@/lib/database"
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const type = searchParams.get("type")
-    const search = searchParams.get("search")
-    const limit = searchParams.get("limit")
-    const sort = searchParams.get("sort")
+    const organizationId = searchParams.get("organizationId")
 
-    // Start with base query using only existing column names
-    let documents
+    const documents = await getDocuments(organizationId || undefined)
 
-    if (!type && !search) {
-      // No filters - simple query
-      if (limit) {
-        const limitNum = Number.parseInt(limit)
-        if (sort === "recent") {
-          documents = await sql`
-            SELECT 
-              id, title, type, status, created_at, updated_at,
-              'medium' as risk_level,
-              0 as clauses_count,
-              1 as pages_count
-            FROM documents 
-            ORDER BY created_at DESC
-            LIMIT ${limitNum}
-          `
-        } else {
-          documents = await sql`
-            SELECT 
-              id, title, type, status, created_at, updated_at,
-              'medium' as risk_level,
-              0 as clauses_count,
-              1 as pages_count
-            FROM documents 
-            ORDER BY updated_at DESC
-            LIMIT ${limitNum}
-          `
-        }
-      } else {
-        if (sort === "recent") {
-          documents = await sql`
-            SELECT 
-              id, title, type, status, created_at, updated_at,
-              'medium' as risk_level,
-              0 as clauses_count,
-              1 as pages_count
-            FROM documents 
-            ORDER BY created_at DESC
-          `
-        } else {
-          documents = await sql`
-            SELECT 
-              id, title, type, status, created_at, updated_at,
-              'medium' as risk_level,
-              0 as clauses_count,
-              1 as pages_count
-            FROM documents 
-            ORDER BY updated_at DESC
-          `
-        }
-      }
-    } else {
-      // Build filtered query
-      if (type && type !== "all" && search) {
-        // Both type and search filters
-        documents = await sql`
-          SELECT 
-            id, title, type, status, created_at, updated_at,
-            'medium' as risk_level,
-            0 as clauses_count,
-            1 as pages_count
-          FROM documents 
-          WHERE type = ${type} AND (title ILIKE ${"%" + search + "%"} OR content ILIKE ${"%" + search + "%"})
-          ORDER BY updated_at DESC
-          ${limit ? sql`LIMIT ${Number.parseInt(limit)}` : sql``}
-        `
-      } else if (type && type !== "all") {
-        // Type filter only
-        documents = await sql`
-          SELECT 
-            id, title, type, status, created_at, updated_at,
-            'medium' as risk_level,
-            0 as clauses_count,
-            1 as pages_count
-          FROM documents 
-          WHERE type = ${type}
-          ORDER BY updated_at DESC
-          ${limit ? sql`LIMIT ${Number.parseInt(limit)}` : sql``}
-        `
-      } else if (search) {
-        // Search filter only
-        documents = await sql`
-          SELECT 
-            id, title, type, status, created_at, updated_at,
-            'medium' as risk_level,
-            0 as clauses_count,
-            1 as pages_count
-          FROM documents 
-          WHERE title ILIKE ${"%" + search + "%"} OR content ILIKE ${"%" + search + "%"}
-          ORDER BY updated_at DESC
-          ${limit ? sql`LIMIT ${Number.parseInt(limit)}` : sql``}
-        `
-      }
-    }
-
-    return NextResponse.json(documents)
+    return NextResponse.json({
+      success: true,
+      data: documents,
+    })
   } catch (error) {
-    console.error("Database error:", error)
-    return NextResponse.json({ error: "Failed to fetch documents" }, { status: 500 })
+    console.error("Error fetching documents:", error)
+    return NextResponse.json({ success: false, error: "Failed to fetch documents" }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { title, type, content, file_path } = body
+    const formData = await request.formData()
+    const file = formData.get("file") as File
+    const title = formData.get("title") as string
+    const type = formData.get("type") as string
+    const organizationId = formData.get("organizationId") as string
 
-    const result = await sql`
-      INSERT INTO documents (title, type, content, file_path, status)
-      VALUES (${title}, ${type}, ${content}, ${file_path}, 'pending')
-      RETURNING id, title, type, status, created_at, updated_at
-    `
+    if (!file || !title || !type) {
+      return NextResponse.json({ success: false, error: "Missing required fields" }, { status: 400 })
+    }
 
-    return NextResponse.json(result[0])
+    // In a real app, you'd upload to cloud storage (Vercel Blob, S3, etc.)
+    const filePath = `/uploads/${Date.now()}-${file.name}`
+
+    const document = await createDocument({
+      title,
+      type,
+      file_path: filePath,
+      file_size: file.size,
+      mime_type: file.type,
+      organization_id: organizationId,
+    })
+
+    // Trigger document analysis (async)
+    fetch(`${process.env.NEXTAUTH_URL}/api/analysis`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ documentId: document.id }),
+    }).catch(console.error)
+
+    return NextResponse.json({
+      success: true,
+      data: document,
+    })
   } catch (error) {
-    console.error("Database error:", error)
-    return NextResponse.json({ error: "Failed to create document" }, { status: 500 })
+    console.error("Error uploading document:", error)
+    return NextResponse.json({ success: false, error: "Failed to upload document" }, { status: 500 })
   }
 }

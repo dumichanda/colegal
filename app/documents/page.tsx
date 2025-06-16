@@ -18,11 +18,6 @@ export default function DocumentsPage() {
   const [selectedDocument, setSelectedDocument] = useState<string | null>(null)
   const [showUpload, setShowUpload] = useState(false)
 
-  // Add state for search and filters
-  const [searchTerm, setSearchTerm] = useState("")
-  const [documentType, setDocumentType] = useState("all")
-  const [riskLevel, setRiskLevel] = useState("all")
-
   return (
     <div className="min-h-screen bg-slate-950">
       <DashboardHeader />
@@ -51,11 +46,9 @@ export default function DocumentsPage() {
                 type="search"
                 placeholder="Search documents by title, content, or clauses..."
                 className="pl-10 bg-slate-900 border-slate-600 text-white placeholder:text-slate-400"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Select value={documentType} onValueChange={setDocumentType}>
+            <Select>
               <SelectTrigger className="w-48 bg-slate-900 border-slate-600 text-white">
                 <SelectValue placeholder="Document Type" />
               </SelectTrigger>
@@ -67,7 +60,7 @@ export default function DocumentsPage() {
                 <SelectItem value="compliance">Compliance</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={riskLevel} onValueChange={setRiskLevel}>
+            <Select>
               <SelectTrigger className="w-48 bg-slate-900 border-slate-600 text-white">
                 <SelectValue placeholder="Risk Level" />
               </SelectTrigger>
@@ -88,13 +81,7 @@ export default function DocumentsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Document List */}
           <div className="lg:col-span-1">
-            <DocumentList
-              selectedDocument={selectedDocument}
-              onSelectDocument={setSelectedDocument}
-              searchTerm={searchTerm}
-              documentType={documentType}
-              riskLevel={riskLevel}
-            />
+            <DocumentList selectedDocument={selectedDocument} onSelectDocument={setSelectedDocument} />
           </div>
 
           {/* Document Analysis */}
